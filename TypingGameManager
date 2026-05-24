@@ -1,0 +1,218 @@
+using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.UI;
+using TMPro;
+using UnityEngine.SceneManagement; // WAJIB: Untuk berpindah atau reload Scene
+
+public class TypingGame : MonoBehaviour
+{
+    [Header("UI Elements")]
+    public TextMeshProUGUI wordDisplay; 
+    public Image timerBar;             
+    public GameObject gameOverPanel;   // Tarik GameOverPanel kamu ke sini
+
+    [Header("Game Settings")]
+    public Color typedColor = Color.cyan;   
+    public Color normalColor = Color.white; 
+    public float timeLimit = 5f;            
+    public string mainMenuSceneName = "MainMenu"; // Tulis nama Scene Main Menu kamu di sini
+
+    [Header("Camera Shake / UI Shake Settings")]
+    public Transform mainCamera;          
+    public float shakeDuration = 0.2f;    
+    public float shakeMagnitude = 12f;   
+
+    public List<string> wordBank = new List<string>(); 
+    
+    private string targetWord = "";
+    private int currentIndex = 0;
+    private float timeRemaining;
+    private bool isGameActive = true;
+
+    private bool isShaking = false;
+    private Vector3 originalCameraPosition;
+    
+    private bool isFirstWord = true; 
+    private string lastWord = ""; 
+
+    void Start()
+    {
+        if (mainCamera != null)
+        {
+            originalCameraPosition = mainCamera.position;
+        }
+
+        // Pastikan panel game over tertutup di awal game
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(false);
+        }
+
+        SetNewWord();
+    }
+
+    void Update()
+    {
+        if (!isGameActive) return;
+
+        HandleTyping();
+        HandleTimer();
+    }
+
+    void SetNewWord()
+    {
+        if (isFirstWord)
+        {
+            targetWord = "SUN MATEK AJI"; 
+            isFirstWord = false;         
+        }
+        else
+        {
+            if (wordBank.Count == 0)
+            {
+                wordBank = new List<string> { "UNITY", "CODING", "GAMEDEV", "TYPING", "KEYBOARD", "MANTAP" };
+            }
+
+            int randomIndex = Random.Range(0, wordBank.Count);
+            string chosenWord = wordBank[randomIndex];
+
+            while (chosenWord == lastWord && wordBank.Count > 1)
+            {
+                randomIndex = Random.Range(0, wordBank.Count);
+                chosenWord = wordBank[randomIndex];
+            }
+
+            targetWord = chosenWord;
+        }
+
+        lastWord = targetWord;
+        currentIndex = 0;
+        timeRemaining = timeLimit;
+        UpdateTextDisplay();
+    }
+
+    void HandleTyping()
+    {
+        if (string.IsNullOrEmpty(Input.inputString)) return;
+
+        foreach (char letter in Input.inputString)
+        {
+            char upperLetter = char.ToUpper(letter);
+
+            if (upperLetter == targetWord[currentIndex])
+            {
+                currentIndex++;
+
+                if (currentIndex >= targetWord.Length)
+                {
+                    if (mainCamera != null)
+                    {
+                        if (isShaking)
+                        {
+                            StopCoroutine(ShakeCamera());
+                            mainCamera.position = originalCameraPosition;
+                        }
+                        StartCoroutine(ShakeCamera());
+                    }
+
+                    if (wordBank.Contains(targetWord))
+                    {
+                        wordBank.Remove(targetWord);
+                    }
+
+                    SetNewWord();
+                    return;
+                }
+
+                UpdateTextDisplay();
+            }
+        }
+    }
+
+    IEnumerator ShakeCamera()
+    {
+        isShaking = true;
+        float elapsed = 0.0f;
+
+        while (elapsed < shakeDuration)
+        {
+            float x = Random.Range(-1f, 1f) * shakeMagnitude;
+            float y = Random.Range(-1f, 1f) * shakeMagnitude;
+
+            mainCamera.position = new Vector3(
+                originalCameraPosition.x + x,
+                originalCameraPosition.y + y,
+                originalCameraPosition.z      
+            );
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        mainCamera.position = originalCameraPosition;
+        isShaking = false;
+    }
+
+    void HandleTimer()
+    {
+        if (timeRemaining > 0)
+        {
+            timeRemaining -= Time.deltaTime;
+
+            if (timerBar != null)
+            {
+                timerBar.fillAmount = timeRemaining / timeLimit;
+            }
+        }
+        else
+        {
+            TriggerGameOver();
+        }
+    }
+
+    void TriggerGameOver()
+    {
+        isGameActive = false;
+        wordDisplay.text = "<color=red>GAME OVER</color>";
+
+        if (isShaking)
+        {
+            StopAllCoroutines();
+            mainCamera.position = originalCameraPosition;
+            isShaking = false;
+        }
+
+        // AKTIFKAN PANEL GAME OVER SECGARA VISUAL
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(true);
+        }
+    }
+
+    void UpdateTextDisplay()
+    {
+        string hexTyped = ColorUtility.ToHtmlStringRGB(typedColor);
+        string hexNormal = ColorUtility.ToHtmlStringRGB(normalColor);
+
+        string typedPart = targetWord.Substring(0, currentIndex);
+        string untypedPart = targetWord.Substring(currentIndex);
+
+        wordDisplay.text = $"<color=#{hexTyped}>{typedPart}</color><color=#{hexNormal}>{untypedPart}</color>";
+    }
+
+    // --- FUNGSI BARU UNTUK TOMBOL RESTART ---
+    public void RestartGame()
+    {
+        // Mengambil nama scene yang sedang aktif saat ini lalu memuatnya ulang
+        string currentSceneName = SceneManager.GetActiveScene().name;
+        SceneManager.LoadScene(currentSceneName);
+    }
+
+    // --- FUNGSI BARU UNTUK TOMBOL MAIN MENU ---
+    public void GoToMainMenu()
+    {
+        // Memuat scene main menu berdasarkan nama yang kamu tulis di Inspector
+        SceneManager.LoadScene(mainMenuSceneName);
+    }
+}
